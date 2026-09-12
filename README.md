@@ -16,6 +16,11 @@ demo shows the enterprise alternative on a local Kubernetes cluster:
   audience-scoped token
 - every hop writes an **audit record** keyed by the full identity chain
 
+> **Building this for real?** [`agent-identity-platform`](https://github.com/fkadusei/agent-identity-platform)
+> turns these concepts into a production-oriented application: a customer-support
+> & refunds copilot with human-in-the-loop approvals, an extracted SDK, MCP tools,
+> and a security baseline. This repo is the concepts; that one is the platform.
+
 ```mermaid
 flowchart TB
     subgraph IDENTITY["IDENTITY PLANE"]
