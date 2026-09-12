@@ -1,0 +1,68 @@
+{
+  "realm": "agent-nhi",
+  "enabled": true,
+  "accessTokenLifespan": 300,
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "credentials": [
+        { "type": "password", "value": "alice123", "temporary": false }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "demo-cli",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "demo-cli-secret-demo",
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false
+    },
+    {
+      "clientId": "spiffe://acme.com/ns/agent-nhi/sa/agent",
+      "description": "THE AGENT. client_id == SPIFFE ID. Authenticates with a JWT-SVID (client-jwt assertion); Keycloak verifies it against the JWKS served by SPIRE's OIDC discovery provider. No client secret exists for this client — that is the point of the demo.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-jwt",
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "use.jwks.url": "true",
+        "jwks.url": "http://spire-oidc-discovery.agent-nhi.svc.cluster.local:11080/keys",
+        "token.endpoint.auth.signing.alg": "ES256"
+      }
+    },
+    {
+      "clientId": "tool-server",
+      "description": "Resource server for the demo tools. Its secret is a server-side credential (the agent never sees it); used for the hop-2 token exchange.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "tool-server-secret-demo",
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "customer-api",
+      "description": "Downstream resource server. Only accepts tokens with aud=customer-api, which is what makes token forwarding fail.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "customer-api-secret-demo",
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ]
+}

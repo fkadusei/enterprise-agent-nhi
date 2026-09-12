@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enterprise NHI for AI Agents — 3D Architecture</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:rgba(22,27,34,.92); --border:#30363d;
+    --text:#e6edf3; --dim:#8b949e;
+    --blue:#4da3ff; --purple:#b088ff; --green:#4dffb8; --orange:#ffb84d; --red:#ff5d5d;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; overflow:hidden; background:var(--bg); color:var(--text);
+    font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; }
+  #scene{ position:fixed; inset:0; display:block; touch-action:none; cursor:grab; }
+  #scene:active{ cursor:grabbing; }
+
+  /* ---------- header ---------- */
+  #header{ position:fixed; top:14px; left:16px; pointer-events:none; z-index:5; }
+  #header h1{ font-size:15px; font-weight:600; letter-spacing:.2px; }
+  #header p{ font-size:11px; color:var(--dim); margin-top:4px; }
+
+  /* ---------- left control panel ---------- */
+  #panel{ position:fixed; top:78px; left:16px; width:214px; display:flex; flex-direction:column; gap:8px; z-index:5; }
+  button{ background:var(--panel); border:1px solid var(--border); color:var(--text);
+    font:inherit; font-size:12px; padding:8px 10px; border-radius:6px; cursor:pointer;
+    text-align:left; transition:border-color .15s, color .15s, background .15s; backdrop-filter:blur(4px); }
+  button:hover{ border-color:var(--blue); }
+  #playBtn{ border-color:#2f81f7; color:var(--blue); font-weight:600; }
+  #playBtn.playing{ border-color:var(--green); color:var(--green); }
+  #attackBtn.active{ border-color:var(--red); color:var(--red); background:rgba(255,93,93,.08); }
+  .stepRow{ display:flex; gap:8px; }
+  .stepRow button{ flex:1; text-align:center; }
+  #hint{ font-size:10.5px; color:var(--dim); line-height:1.5; padding:2px 2px 0; }
+
+  /* ---------- bottom bar: caption ---------- */
+  #bottombar{ position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:center;
+    padding:12px 16px 14px; background:linear-gradient(transparent, rgba(13,17,23,.95) 45%);
+    pointer-events:none; z-index:5; }
+  #caption{ pointer-events:auto; max-width:640px; width:min(640px, 60vw); background:var(--panel);
+    border:1px solid var(--border); border-left:3px solid var(--blue); border-radius:8px;
+    padding:10px 14px; backdrop-filter:blur(4px); }
+  #capTitle{ font-size:12px; font-weight:600; color:var(--blue); margin-bottom:4px; }
+  #capBody{ font-size:11.5px; color:var(--dim); line-height:1.55; white-space:pre-line; }
+
+  /* ---------- legend (bottom-left) ---------- */
+  #legend{ position:fixed; left:16px; bottom:16px; background:var(--panel); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px; font-size:10.5px; color:var(--dim); z-index:5; backdrop-filter:blur(4px); }
+  #legend h4{ font-size:10px; color:var(--text); margin-bottom:6px; letter-spacing:.5px; }
+  #legend .row{ display:flex; align-items:center; gap:7px; margin:3px 0; }
+  #legend .sw{ width:10px; height:10px; border-radius:2px; flex:none; }
+  #legend .ln{ width:14px; height:0; border-top:2px solid; flex:none; }
+  #legend .ln.dash{ border-top-style:dashed; }
+
+  /* ---------- right info panel ---------- */
+  #info{ position:fixed; top:78px; right:16px; width:300px; background:var(--panel);
+    border:1px solid var(--border); border-radius:8px; padding:14px; display:none; z-index:6; backdrop-filter:blur(4px); }
+  #info h3{ font-size:13px; margin-bottom:8px; padding-right:22px; }
+  #info p{ font-size:11.5px; color:var(--dim); line-height:1.6; }
+  #info .cfgLabel{ font-size:10px; color:var(--dim); margin-top:12px; letter-spacing:.5px; text-transform:uppercase; }
+  #info code{ display:block; font-size:11px; color:var(--green); background:#0d1117;
+    border:1px solid var(--border); border-radius:5px; padding:6px 8px; margin-top:5px; white-space:pre-line; }
+  #infoClose{ position:absolute; top:8px; right:10px; border:none; background:none; color:var(--dim);
+    font-size:14px; padding:2px 6px; }
+  #infoClose:hover{ color:var(--text); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="header">
+  <h1>Enterprise NHI for AI Agents — SPIFFE + OAuth Token Exchange + OPA</h1>
+  <p>Click a component. Play the trust flow. Toggle attack mode.</p>
+</div>
+
+<div id="panel">
+  <button id="playBtn">▶ Play trust flow</button>
+  <div class="stepRow">
+    <button id="prevBtn" title="Previous hop">◀ Step</button>
+    <button id="nextBtn" title="Next hop">Step ▶</button>
+  </div>
+  <button id="viewBtn">▦ View: 3D</button>
+  <button id="attackBtn">⚠ Attack mode</button>
+  <div id="hint">Left-drag rotate · wheel zoom · right-drag pan.<br>Click any box for its repo config.</div>
+</div>
+
+<div id="legend">
+  <h4>LEGEND</h4>
+  <div class="row"><span class="sw" style="background:var(--blue)"></span>Identity plane</div>
+  <div class="row"><span class="sw" style="background:var(--purple)"></span>Workload plane</div>
+  <div class="row"><span class="sw" style="background:var(--green)"></span>Resource plane</div>
+  <div class="row"><span class="sw" style="background:var(--orange)"></span>Audit plane</div>
+  <div class="row"><span class="ln" style="border-color:var(--blue)"></span>Identity issuance</div>
+  <div class="row"><span class="ln" style="border-color:var(--green)"></span>Authorized call</div>
+  <div class="row"><span class="ln dash" style="border-color:var(--red)"></span>Blocked attack</div>
+  <div class="row"><span class="ln" style="border-color:var(--orange); opacity:.5"></span>Audit trail</div>
+</div>
+
+<div id="info">
+  <button id="infoClose">✕</button>
+  <h3 id="infoTitle"></h3>
+  <p id="infoDesc"></p>
+  <div class="cfgLabel">Config in repo:</div>
+  <code id="infoCfg"></code>
+</div>
+
+<div id="bottombar">
+  <div id="caption">
+    <div id="capTitle">Enterprise NHI reference architecture</div>
+    <div id="capBody">Zero static credentials · no token forwarding · deny-by-default authorization · full audit trail.
+Press ▶ to walk the 6-hop trust flow, or ⚠ to see how attacks are blocked.</div>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================================
+ * Enterprise NHI for AI Agents — interactive 3D architecture visualization.
+ * Single-file, file://-safe: global THREE (UMD r149), no modules, no fetch.
+ *
+ * ALL scene content lives in SCENE_DATA below.
+ * MCP migration later = edit this data only.
+ * =================================================================================== */
+const SCENE_DATA = {
+  planes: [
+    { id: "identity", name: "IDENTITY PLANE",  y:  6.0, color: 0x4da3ff, css: "#4da3ff" },
+    { id: "workload", name: "WORKLOAD PLANE",  y:  2.5, color: 0xb088ff, css: "#b088ff" },
+    { id: "resource", name: "RESOURCE PLANE",  y: -1.0, color: 0x4dffb8, css: "#4dffb8" },
+    { id: "audit",    name: "AUDIT PLANE",     y: -4.5, color: 0xffb84d, css: "#ffb84d" }
+  ],
+  nodes: [
+    { id: "user", plane: "identity", x: -7.5, z: 0, label: "User (alice)",
+      desc: "Human user. Logs in via OIDC and gets a user token from Keycloak. The agent acts on her behalf.",
+      config: "—" },
+    { id: "keycloak", plane: "identity", x: -2.5, z: 0, label: "Keycloak",
+      desc: "OAuth 2.0 / OIDC Authorization Server. Issues user tokens and performs RFC 8693 token exchange: swaps the user token + the agent's SVID for short-lived audience-scoped tokens carrying the delegation chain (sub=user, act=agent).",
+      config: "k8s/keycloak/" },
+    { id: "spire-server", plane: "identity", x: 2.5, z: 0, label: "SPIRE Server",
+      desc: "Identity root of trust. Attests workloads (Kubernetes namespace + service account) and signs SPIFFE Verifiable Identity Documents (SVIDs). Registry of who-is-who.",
+      config: "k8s/spire/" },
+    { id: "spire-agent", plane: "identity", x: 7.5, z: 0, label: "SPIRE Agent",
+      desc: "Per-node daemon exposing the Workload API socket. Delivers fresh SVIDs to pods with no secrets on disk. TTL ~5 min, auto-rotated.",
+      config: "k8s/spire/" },
+    { id: "agent", plane: "workload", x: 0, z: 0, size: 1.25, label: "AI Agent Runtime",
+      desc: "The LLM-backed agent. Fetches a JWT-SVID from the Workload API (no API keys anywhere), authenticates to Keycloak AS its SPIFFE identity, exchanges the user's token, calls tools. SPIFFE ID: spiffe://acme.com/ns/agent-nhi/sa/agent",
+      config: "src/agent/\nk8s/apps/agent.yaml" },
+    { id: "rogue", plane: "workload", x: 6.5, z: 1.4, label: "Rogue Workload", color: 0xff5d5d, hidden: true,
+      desc: "Unregistered workload with no SPIRE registration entry. It can ask for an identity, but SPIRE refuses to issue one — no identity, no token, no access.",
+      config: "—" },
+    { id: "tool-server", plane: "resource", x: -5, z: 0.6, label: "Tool Server",
+      desc: "Resource server exposing tools (customer.profile.read, customer.payments.read). Validates the token (JWKS, audience, expiry), extracts the delegation chain, and asks OPA before every tool call. Never forwards tokens — it performs its own token exchange to reach downstream services.",
+      config: "src/tool_server/" },
+    { id: "opa", plane: "resource", x: 0, z: -0.6, label: "OPA Policy Engine",
+      desc: "Deny-by-default authorization. Policy decides allow/deny from (agent identity, user, tool). Policy changes ship via PR, not redeploys. Every decision is logged.",
+      config: "opa/policy.rego" },
+    { id: "customer-api", plane: "resource", x: 5, z: 0.6, label: "Customer API (downstream)",
+      desc: "A downstream service that only accepts tokens issued for ITS audience. Proves tokens are never forwarded: the agent's tool-server token is rejected here.",
+      config: "src/customer_api/" },
+    { id: "audit", plane: "audit", x: 0, z: 0, label: "Audit Log Stream",
+      desc: "Every hop emits structured logs keyed by (spiffe_id, sub user, act agent, tool, decision). One query answers: which agent did what, on whose behalf, why was it allowed.",
+      config: "src/shared/audit.py" }
+  ],
+  // Numbered trust-flow hops (played in sequence). color meaning: blue=identity issuance, green=authorized call.
+  flows: [
+    { from: "user", to: "keycloak", color: 0x4da3ff, css: "#4da3ff",
+      label: "1. User login (OIDC) → user token",
+      explain: "Alice authenticates with OIDC (authorization code + PKCE). Keycloak issues a user token representing her identity." },
+    { from: "spire-agent", to: "agent", color: 0x4da3ff, css: "#4da3ff",
+      label: "2. Workload attestation → JWT-SVID (no secrets)",
+      explain: "The agent pod asks the node-local SPIRE Agent for an identity over the Workload API socket. SPIRE attests the pod (namespace + service account) and returns a short-lived JWT-SVID — no secrets on disk, nothing to steal." },
+    { from: "agent", to: "keycloak", color: 0x4da3ff, css: "#4da3ff",
+      label: "3. RFC 8693 token exchange: SVID auth + user token → scoped token (sub=alice, act=agent, aud=tool-server)",
+      explain: "The agent authenticates to Keycloak AS its SPIFFE identity and exchanges alice's user token (RFC 8693). It receives a short-lived token scoped to aud=tool-server, carrying the delegation chain sub=alice, act=agent." },
+    { from: "agent", to: "tool-server", color: 0x4dffb8, css: "#4dffb8", lift: 1.9,
+      label: "4. Tool call with scoped token",
+      explain: "The agent invokes the tool with the scoped token. The tool server validates the signature (JWKS), the audience and the expiry, then extracts the delegation chain (sub=alice, act=agent)." },
+    { from: "tool-server", to: "opa", color: 0x4dffb8, css: "#4dffb8",
+      label: "5. Policy check: (agent, alice, tool) → allow/deny",
+      explain: "Before executing, the tool server asks OPA: may this agent, acting for alice, call this tool? Policy is deny-by-default — and every decision is logged." },
+    { from: "tool-server", to: "customer-api", color: 0x4dffb8, css: "#4dffb8",
+      label: "6. SECOND token exchange → new token aud=customer-api (original never forwarded)",
+      explain: "To call downstream, the tool server performs its OWN RFC 8693 exchange for a token with aud=customer-api. The agent's token is never forwarded." }
+  ],
+  // Faint static trust edges (always visible).
+  statics: [
+    { from: "keycloak", to: "spire-server", label: "trusts SVID signing keys via OIDC discovery JWKS" }
+  ],
+  // Everything emits to the audit stream (thin orange lines).
+  auditFrom: ["user", "keycloak", "spire-server", "spire-agent", "agent", "tool-server", "opa", "customer-api"],
+  // Attack-mode-only edges: red dashed, pulse dies partway with a burst.
+  attacks: [
+    { badge: "A1", from: "rogue", to: "spire-agent", lift: 0.9,
+      label: "ATTACK 1 — Rogue workload asks for SVID: no matching registration entry → SPIRE refuses. No identity, no token." },
+    { badge: "A2", from: "agent", to: "customer-api", lift: 1.2,
+      label: "ATTACK 2 — Token forwarding: agent's token (aud=tool-server) sent straight to Customer API → rejected, audience mismatch." },
+    { badge: "A3", from: "agent", to: "tool-server", lift: -1.8,
+      label: "ATTACK 3 — Out-of-policy tool: agent calls customer.payments.read for alice → OPA deny-by-default → 403." }
+  ]
+};
+
+/* ---------------------------------- helpers ---------------------------------- */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const cssColor = (hex) => "#" + hex.toString(16).padStart(6, "0");
+
+// Soft radial glow texture (white — tinted per-sprite via material color).
+function makeGlowTexture() {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.25, "rgba(255,255,255,.55)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+
+// Canvas-texture text sprite. scale = world units per canvas pixel.
+function makeTextSprite(text, { size = 40, color = "#e6edf3", scale = 0.0052, weight = 600 } = {}) {
+  const pad = 20, font = weight + " " + size + "px Menlo, Consolas, monospace";
+  const c = document.createElement("canvas"), ctx = c.getContext("2d");
+  ctx.font = font;
+  const w = Math.ceil(ctx.measureText(text).width) + pad * 2, h = size + pad * 2;
+  c.width = w * 2; c.height = h * 2; ctx.scale(2, 2); ctx.font = font;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,.9)"; ctx.shadowBlur = 6;
+  ctx.fillStyle = color; ctx.fillText(text, w / 2, h / 2);
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.minFilter = THREE.LinearFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  s.scale.set(w * scale, h * scale, 1);
+  return s;
+}
+
+// Numbered circular badge (hop markers) / red ✗ blocked marker / attack tag.
+function makeBadgeSprite(text, colorCss, { xMark = false } = {}) {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const ctx = c.getContext("2d");
+  ctx.lineWidth = 7; ctx.strokeStyle = colorCss;
+  ctx.fillStyle = xMark ? "rgba(13,17,23,.85)" : colorCss;
+  ctx.shadowColor = colorCss; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.arc(64, 64, 48, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+  if (xMark) {                                   // draw ✗ manually (font-safe)
+    ctx.lineWidth = 12; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(42, 42); ctx.lineTo(86, 86);
+    ctx.moveTo(86, 42); ctx.lineTo(42, 86);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = "#0d1117"; ctx.font = "700 52px Menlo, Consolas, monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(text, 64, 67);
+  }
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  s.scale.set(0.62, 0.62, 1);
+  return s;
+}
+
+// Translucent rounded plane with soft glowing border, drawn on a canvas texture.
+function makePlaneMesh(width, depth, colorCss) {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 512;
+  const ctx = c.getContext("2d");
+  const x = 26, y = 26, w = 972, h = 460, r = 46;
+  const rr = () => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+  rr(); ctx.fillStyle = colorCss + "12"; ctx.fill();                 // faint fill
+  ctx.strokeStyle = colorCss + "22"; ctx.lineWidth = 1;              // faint grid
+  for (let gx = x + 64; gx < x + w; gx += 64) { ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); ctx.stroke(); }
+  for (let gy = y + 64; gy < y + h; gy += 64) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke(); }
+  ctx.shadowColor = colorCss; ctx.shadowBlur = 26;                   // glowing border
+  ctx.strokeStyle = colorCss; ctx.lineWidth = 5;
+  rr(); ctx.stroke(); rr(); ctx.stroke();
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+/* ------------------------------ renderer / scene ------------------------------ */
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x0d1117, 1);
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(6, 14, 9);
+scene.add(sun);
+
+const glowTex = makeGlowTexture();
+const PLANE_W = 20, PLANE_D = 9.5;
+const planeById = {}, nodeById = {};
+const nodeMeshes = [];                              // raycast targets
+
+/* --------------------------- build scene from data ---------------------------- */
+SCENE_DATA.planes.forEach((p) => {
+  planeById[p.id] = p;
+  const mesh = makePlaneMesh(PLANE_W, PLANE_D, p.css);
+  mesh.position.y = p.y;
+  scene.add(mesh);
+  const tag = makeTextSprite(p.name, { size: 30, color: p.css, scale: 0.0042, weight: 700 });
+  tag.position.set(-PLANE_W / 2 + 1.55, p.y + 0.12, PLANE_D / 2 - 0.55);
+  scene.add(tag);
+});
+
+SCENE_DATA.nodes.forEach((n) => {
+  const plane = planeById[n.plane];
+  const accent = n.color !== undefined ? n.color : plane.color;
+  const accentCss = cssColor(accent);
+  const s = n.size || 1;
+  const geo = new THREE.BoxGeometry(1.7 * s, 1.05 * s, 1.7 * s);
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(accent).multiplyScalar(0.32),
+    emissive: accent, emissiveIntensity: 0.22, roughness: 0.35, metalness: 0.15
+  });
+  const box = new THREE.Mesh(geo, mat);
+  const y = plane.y + (1.05 * s) / 2 + 0.02;
+  box.position.set(n.x, y, n.z);
+  box.userData.nodeId = n.id;
+
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.95 })
+  );
+  box.add(edges);
+
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: accent, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  }));
+  glow.scale.set(4.2 * s, 4.2 * s, 1);
+  glow.position.copy(box.position);
+
+  const label = makeTextSprite(n.label, { color: "#e6edf3" });
+  label.position.set(n.x, y + (1.05 * s) / 2 + 0.55, n.z);
+
+  const group = new THREE.Group();
+  group.add(box, glow, label);
+  group.visible = !n.hidden;
+  scene.add(group);
+  nodeMeshes.push(box);
+  nodeById[n.id] = { data: n, box, edges, glow, label, group, pos: box.position.clone(), accent };
+});
+
+// Curved edge between two node centers (arc lifts upward by `lift`).
+function edgeCurve(fromId, toId, lift) {
+  const a = nodeById[fromId].pos, b = nodeById[toId].pos;
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  mid.y += lift !== undefined ? lift : a.distanceTo(b) * 0.15;
+  return new THREE.QuadraticBezierCurve3(a, mid, b);
+}
+function glowTube(curve, color, radius, opacity) {
+  return new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 48, radius, 8, false),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+}
+
+// Trust-flow hops: glowing tube + halo + numbered badge + ambient pulses.
+const flowEdges = SCENE_DATA.flows.map((f, i) => {
+  const curve = edgeCurve(f.from, f.to, f.lift);
+  const tube = glowTube(curve, f.color, 0.045, 0.55);
+  const halo = glowTube(curve, f.color, 0.13, 0.10);
+  const badge = makeBadgeSprite(String(i + 1), f.css);
+  badge.position.copy(curve.getPointAt(0.5)).y += 0.42;
+  scene.add(tube, halo, badge);
+  const pulses = [0, 0.5].map((off) => {
+    const p = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTex, color: f.color, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+    p.scale.set(0.55, 0.55, 1);
+    p.userData.t = off;
+    scene.add(p);
+    return p;
+  });
+  return { data: f, curve, tube, halo, badge, pulses };
+});
+
+// Faint static trust edges with small labels.
+SCENE_DATA.statics.forEach((s) => {
+  const curve = edgeCurve(s.from, s.to, 1.1);
+  const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(40));
+  scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+    color: 0x8b949e, transparent: true, opacity: 0.35 })));
+  const lbl = makeTextSprite(s.label, { size: 26, color: "#8b949e", scale: 0.0038, weight: 400 });
+  lbl.position.copy(curve.getPointAt(0.5)).y += 0.4;
+  scene.add(lbl);
+});
+
+// Everything → audit: thin orange lines.
+{
+  const auditPos = nodeById["audit"].pos;
+  SCENE_DATA.auditFrom.forEach((id) => {
+    const geo = new THREE.BufferGeometry().setFromPoints([nodeById[id].pos, auditPos]);
+    scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({
+      color: 0xffb84d, transparent: true, opacity: 0.13 })));
+  });
+}
+
+// Attack mode: red dashed edges, blocked pulse + burst, ✗ marker, A# tag.
+const attackGroup = new THREE.Group();
+attackGroup.visible = false;
+scene.add(attackGroup);
+const attackAnims = SCENE_DATA.attacks.map((a, i) => {
+  const curve = edgeCurve(a.from, a.to, a.lift);
+  const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(60));
+  const line = new THREE.Line(geo, new THREE.LineDashedMaterial({
+    color: 0xff5d5d, dashSize: 0.28, gapSize: 0.2, transparent: true, opacity: 0.9 }));
+  line.computeLineDistances();
+  const block = curve.getPointAt(0.5);
+  const xMark = makeBadgeSprite("", "#ff5d5d", { xMark: true });
+  xMark.position.copy(block);
+  const tag = makeTextSprite(a.badge, { size: 34, color: "#ff5d5d", scale: 0.0045, weight: 700 });
+  tag.position.copy(block).add(new THREE.Vector3(0.75, 0.45, 0));
+  const pulse = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: 0xff5d5d, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pulse.scale.set(0.6, 0.6, 1);
+  const burst = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color: 0xff8080, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  burst.position.copy(block);
+  attackGroup.add(line, xMark, tag, pulse, burst);
+  return { curve, pulse, burst, t: -i * 0.8 };      // staggered phase
+});
+
+/* ------------------- mini orbit controls (r149 UMD-safe) ------------------- */
+const controls = (() => {
+  const target = new THREE.Vector3(0, 0.8, 0);
+  const cur = { r: 25, phi: 1.12, theta: 0.45 }, goal = { ...cur };
+  const panGoal = target.clone();
+  const pointers = new Map();
+  let pinch = 0, moved = 0, lastInteract = -10, elapsed = 0, onTap = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, btn: e.button });
+    moved = 0; lastInteract = elapsed;
+    if (pointers.size === 2) {
+      const p = [...pointers.values()];
+      pinch = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    }
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    moved += Math.abs(dx) + Math.abs(dy); lastInteract = elapsed;
+    if (pointers.size === 2) {                       // pinch zoom + two-finger pan
+      const q = [...pointers.values()];
+      const d = Math.hypot(q[0].x - q[1].x, q[0].y - q[1].y);
+      if (pinch > 0) goal.r = clamp(goal.r * pinch / d, 8, 60);
+      pinch = d; pan(dx * 0.5, dy * 0.5);
+    } else if (p.btn === 2) pan(dx, dy);             // right-drag pan
+    else {                                           // left-drag rotate
+      goal.theta -= dx * 0.005;
+      goal.phi = clamp(goal.phi - dy * 0.005, 0.04, Math.PI / 2 + 0.25);
+    }
+  });
+  const pan = (dx, dy) => {
+    const s = goal.r * 0.0011;
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    panGoal.addScaledVector(right, -dx * s).addScaledVector(up, dy * s);
+    panGoal.y = clamp(panGoal.y, -5, 7);
+  };
+  window.addEventListener("pointerup", (e) => {
+    if (pointers.has(e.pointerId) && moved < 6 && onTap) onTap(e);
+    pointers.delete(e.pointerId);
+  });
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault(); lastInteract = elapsed;
+    goal.r = clamp(goal.r * Math.exp(e.deltaY * 0.001), 8, 60);
+  }, { passive: false });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  return {
+    goal,
+    idle: () => elapsed - lastInteract > 4 && pointers.size === 0,
+    tick: (dt) => { elapsed += dt; },
+    setOnTap: (fn) => { onTap = fn; },
+    update: (dt, autoOrbit) => {
+      if (autoOrbit) goal.theta += dt * 0.05;
+      const k = 1 - Math.pow(0.0001, dt);            // damping
+      cur.r += (goal.r - cur.r) * k;
+      cur.phi += (goal.phi - cur.phi) * k;
+      cur.theta += (goal.theta - cur.theta) * k;
+      target.lerp(panGoal, k);
+      camera.position.setFromSpherical(new THREE.Spherical(cur.r, cur.phi, cur.theta)).add(target);
+      camera.lookAt(target);
+    }
+  };
+})();
+
+/* ------------------------------- UI wiring ------------------------------- */
+const $ = (id) => document.getElementById(id);
+const playBtn = $("playBtn"), attackBtn = $("attackBtn"), viewBtn = $("viewBtn");
+const capTitle = $("capTitle"), capBody = $("capBody");
+
+let playing = false, currentStep = -1, stepT = 0, attackMode = false, is2D = false;
+let savedView = null, oneShot = null, selectedId = null;
+const TRAVEL = 1.7, HOLD = 0.8;
+
+const playPulse = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowTex, color: 0xffffff, transparent: true,
+  blending: THREE.AdditiveBlending, depthWrite: false }));
+playPulse.scale.set(0.95, 0.95, 1);
+playPulse.visible = false;
+scene.add(playPulse);
+
+function setCaption(title, body, css) {
+  capTitle.textContent = title;
+  capTitle.style.color = css || "#4da3ff";
+  capBody.textContent = body;
+  $("caption").style.borderLeftColor = css || "#4da3ff";
+}
+function idleCaption() {
+  setCaption("Enterprise NHI reference architecture",
+    "Zero static credentials · no token forwarding · deny-by-default authorization · full audit trail.\n" +
+    "Press ▶ to walk the 6-hop trust flow, or ⚠ to see how attacks are blocked.");
+}
+function highlightStep(idx) {
+  flowEdges.forEach((e, i) => {
+    const active = i === idx;
+    e.tube.material.opacity = active ? 1.0 : 0.45;
+    e.halo.material.opacity = active ? 0.22 : 0.08;
+  });
+}
+function showStep(i) {
+  currentStep = i; stepT = 0;
+  const f = SCENE_DATA.flows[i];
+  setCaption("Trust flow — hop " + (i + 1) + " / " + SCENE_DATA.flows.length,
+    f.label + "\n" + f.explain, f.css);
+  highlightStep(i);
+}
+function stopPlayback() {
+  playing = false; playPulse.visible = false; oneShot = null;
+  playBtn.textContent = "▶ Play trust flow";
+  playBtn.classList.remove("playing");
+}
+
+playBtn.addEventListener("click", () => {
+  if (attackMode) attackBtn.click();                 // leave attack mode first
+  if (playing) { stopPlayback(); return; }
+  playing = true;
+  playBtn.textContent = "⏸ Pause";
+  playBtn.classList.add("playing");
+  showStep(currentStep < 0 ? 0 : currentStep);
+});
+$("prevBtn").addEventListener("click", () => {
+  if (attackMode) return;
+  const n = SCENE_DATA.flows.length;
+  const i = ((currentStep < 0 ? 0 : currentStep) - 1 + n) % n;
+  showStep(i);
+  if (!playing) oneShot = { edge: flowEdges[i], t: 0 };
+});
+$("nextBtn").addEventListener("click", () => {
+  if (attackMode) return;
+  const n = SCENE_DATA.flows.length;
+  const i = ((currentStep < 0 ? -1 : currentStep) + 1) % n;
+  showStep(i);
+  if (!playing) oneShot = { edge: flowEdges[i], t: 0 };
+});
+
+viewBtn.addEventListener("click", () => {
+  is2D = !is2D;
+  viewBtn.textContent = is2D ? "▦ View: 2D" : "▦ View: 3D";
+  if (is2D) {
+    savedView = { ...controls.goal };
+    controls.goal.phi = 0.08;                        // near top-down
+    controls.goal.r = 27;
+  } else if (savedView) Object.assign(controls.goal, savedView);
+});
+
+attackBtn.addEventListener("click", () => {
+  attackMode = !attackMode;
+  attackBtn.classList.toggle("active", attackMode);
+  attackGroup.visible = attackMode;
+  nodeById["rogue"].group.visible = attackMode;
+  if (attackMode) {
+    stopPlayback(); highlightStep(-1);
+    flowEdges.forEach((e) => { e.tube.material.opacity = 0.18; e.halo.material.opacity = 0.04; });
+    setCaption("⚠ Attack mode — all three attacks are blocked",
+      SCENE_DATA.attacks.map((a) => a.label).join("\n"), "#ff5d5d");
+  } else {
+    flowEdges.forEach((e) => { e.tube.material.opacity = 0.55; e.halo.material.opacity = 0.10; });
+    currentStep = -1; idleCaption();
+  }
+});
+
+/* ------------------------- picking (raycast on tap) ------------------------- */
+const raycaster = new THREE.Raycaster();
+controls.setOnTap((e) => {
+  const ndc = new THREE.Vector2(
+    (e.clientX / window.innerWidth) * 2 - 1,
+    -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes, false)
+    .filter((h) => nodeById[h.object.userData.nodeId].group.visible);   // skip hidden (rogue)
+  selectNode(hits.length ? hits[0].object.userData.nodeId : null);
+});
+function selectNode(id) {
+  if (selectedId && nodeById[selectedId]) {          // restore previous
+    const prev = nodeById[selectedId];
+    prev.edges.material.color.setHex(prev.accent);
+    prev.glow.material.opacity = 0.3;
+  }
+  selectedId = id;
+  if (!id) { $("info").style.display = "none"; return; }
+  const n = nodeById[id];
+  n.edges.material.color.setHex(0xffffff);
+  n.glow.material.opacity = 0.55;
+  $("infoTitle").textContent = n.data.label;
+  $("infoTitle").style.color = cssColor(n.accent);
+  $("infoDesc").textContent = n.data.desc;
+  $("infoCfg").textContent = n.data.config;
+  $("info").style.display = "block";
+}
+$("infoClose").addEventListener("click", () => selectNode(null));
+
+/* ------------------------------- animate ------------------------------- */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  controls.tick(dt);
+
+  // Ambient pulses drift along every hop (hidden while a step is playing).
+  const ambientOn = !playing && !attackMode;
+  flowEdges.forEach((e) => e.pulses.forEach((p) => {
+    p.visible = ambientOn;
+    if (!ambientOn) return;
+    p.userData.t = (p.userData.t + dt * 0.22) % 1;
+    p.position.copy(e.curve.getPointAt(p.userData.t));
+  }));
+
+  // Sequenced playback: one pulse travels the active hop, then advance.
+  if (playing && currentStep >= 0) {
+    stepT += dt;
+    const edge = flowEdges[currentStep];
+    const u = clamp(stepT / TRAVEL, 0, 1);
+    playPulse.visible = true;
+    playPulse.position.copy(edge.curve.getPointAt(u));
+    playPulse.material.color.setHex(u > 0.9 ? 0xffffff : edge.data.color);
+    if (stepT > TRAVEL + HOLD) {
+      if (currentStep + 1 < SCENE_DATA.flows.length) showStep(currentStep + 1);
+      else {
+        stopPlayback(); highlightStep(-1); currentStep = -1;
+        setCaption("Trust flow complete ✓",
+          "Six hops, zero static credentials. Every call carried a short-lived, audience-scoped token; every decision was checked by OPA and written to the audit stream.",
+          "#4dffb8");
+      }
+    }
+  } else if (oneShot) {                              // manual step: single pulse
+    oneShot.t += dt / TRAVEL;
+    playPulse.visible = oneShot.t < 1;
+    playPulse.material.color.setHex(oneShot.edge.data.color);
+    playPulse.position.copy(oneShot.edge.curve.getPointAt(clamp(oneShot.t, 0, 1)));
+    if (oneShot.t >= 1) oneShot = null;
+  } else {
+    playPulse.visible = false;
+  }
+
+  // Attack mode: red pulses travel partway, die with a burst at the ✗.
+  if (attackMode) {
+    const T1 = 1.2, T2 = 0.45, TOTAL = T1 + T2 + 1.0;
+    attackAnims.forEach((a) => {
+      a.t += dt;
+      if (a.t >= TOTAL) a.t = 0;
+      if (a.t < 0) { a.pulse.visible = a.burst.visible = false; return; }
+      if (a.t < T1) {
+        a.pulse.visible = true; a.burst.visible = false;
+        a.pulse.position.copy(a.curve.getPointAt((a.t / T1) * 0.5));
+      } else if (a.t < T1 + T2) {
+        a.pulse.visible = false; a.burst.visible = true;
+        const u = (a.t - T1) / T2;
+        const s = 0.5 + u * 1.8;
+        a.burst.scale.set(s, s, 1);
+        a.burst.material.opacity = 1 - u;
+      } else { a.pulse.visible = a.burst.visible = false; }
+    });
+  }
+
+  controls.update(dt, controls.idle() && !playing && !is2D);   // auto-orbit when idle
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

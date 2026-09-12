@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local secrets — NEVER commit. The only credential in this demo is the
+# optional LLM API key (see docs/threat-model.md "the last static credential").
+.env
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

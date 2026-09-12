@@ -1,0 +1,42 @@
+# CI: the repo's invariants, checked on every push.
+#   1. rego policy tests — authorization logic is tested like code
+#   2. python syntax check — all three services + shared lib
+#   3. gitleaks — proves "nothing secret-shaped committed" continuously
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  opa-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install opa
+        run: |
+          curl -sSfL -o opa https://openpolicyagent.org/downloads/v0.68.0/opa_linux_amd64_static
+          chmod +x opa
+      - name: opa test
+        run: ./opa test opa/ -v
+
+  python-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: syntax check
+        run: python -m compileall -q src/
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

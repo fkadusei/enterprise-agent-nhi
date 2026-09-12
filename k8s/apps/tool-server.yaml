@@ -1,0 +1,46 @@
+# Tool server — policy enforcement point (see src/tool_server/app.py).
+# TOOL_SERVER_CLIENT_SECRET is a SERVER-side demo credential used only for the
+# hop-2 token exchange. The agent never sees it. Production: K8s Secret + rotation.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-server
+  namespace: agent-nhi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-server
+  template:
+    metadata:
+      labels:
+        app: tool-server
+    spec:
+      containers:
+        - name: tool-server
+          image: agent-nhi/tool-server:demo
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TOOL_SERVER_CLIENT_SECRET
+              value: tool-server-secret-demo   # demo value, matches realm.json
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tool-server
+  namespace: agent-nhi
+spec:
+  selector:
+    app: tool-server
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
