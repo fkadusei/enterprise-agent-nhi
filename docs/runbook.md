@@ -8,8 +8,16 @@
 ```
 
 Prereqs: Docker Desktop running, `kind`, `kubectl`. For the default LLM path:
-`brew install ollama && ollama pull llama3.2:3b` (Ollama must be RUNNING on
-the host during the demo — the agent reaches it at `host.docker.internal:11434`).
+`brew install ollama && ollama pull llama3.2:3b`, then start it so the cluster
+can reach it — `OLLAMA_HOST=0.0.0.0:11434 ollama serve`. The agent calls it at
+`host.docker.internal:11434`; if it isn't reachable, the agent logs
+`llm.fallback` and uses a deterministic default tool (identity/policy flow is
+unaffected). Verify reachability from the cluster with:
+
+```sh
+kubectl -n agent-nhi exec deploy/agent -- \
+  python -c "import httpx;print(httpx.get('http://host.docker.internal:11434/api/tags',timeout=5).json()['models'])"
+```
 
 For the API-key LLM path instead: `cp .env.example .env`, add your key, set
 `LLM_PROVIDER: openai` in `k8s/apps/agent.yaml`, re-run setup.

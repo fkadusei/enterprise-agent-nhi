@@ -51,8 +51,17 @@ attacks get blocked. Built for presenting.
 
 ## Run it
 
-Prereqs: Docker, `kind` (`brew install kind`), `kubectl`. Optional for the
-default LLM path: Ollama (`brew install ollama && ollama pull llama3.2:3b`).
+Prereqs: Docker, `kind` (`brew install kind`), `kubectl`. For the default LLM
+path, Ollama must be installed **and running so the cluster can reach it**:
+
+```sh
+brew install ollama && ollama pull llama3.2:3b
+OLLAMA_HOST=0.0.0.0:11434 ollama serve   # leave running in another terminal
+```
+
+(`0.0.0.0` matters: the agent pod calls it at `host.docker.internal:11434`. If
+Ollama isn't running, the agent logs `llm.fallback` and uses a deterministic
+default tool — the identity/policy flow is unaffected.)
 
 ```sh
 ./scripts/setup.sh          # ~5 min: cluster, SPIRE, Keycloak, OPA, apps
