@@ -43,12 +43,25 @@ import SPIRE's bundle public key directly onto the client
 `http://spire-oidc-discovery:11080/keys` via a one-off
 `kubectl exec` + `kcadm.sh`), accepting that it goes stale when SPIRE
 rotates its key (~hours). The plain-HTTP URL works on the pinned Keycloak
-26.0 with `start-dev`.
+26.6.4 with `start-dev`.
 
-**`token exchange failed: 400 ... invalid_grant` / 403**
-The exchange happened but a permission is missing → re-run
-`kubectl -n agent-nhi exec -i deploy/keycloak -- bash -s < scripts/keycloak-token-exchange.sh`
-(the four grants are listed at the top of that script).
+**`invalid_client: Token jti claim is required`**
+The `jti` CredentialComposer plugin isn't loaded. Check
+`kubectl -n agent-nhi logs spire-server-0 -c spire-server | grep -i jti` for
+`Plugin loaded`, and confirm the custom server image is in use
+(`kubectl -n agent-nhi get sts spire-server -o jsonpath='{.spec.template.spec.containers[0].image}'`).
+
+**`invalid_client: Token reuse detected`**
+The SPIRE agent is serving a cached JWT-SVID (same `jti`). Confirm the custom
+agent image is in use (`... containers[0].image` on the spire-agent DaemonSet)
+— it disables the JWT-SVID cache so every fetch mints a fresh SVID.
+
+**`invalid_token: subject_token validation failure`**
+Issuer mismatch. Keycloak derives `iss` from the request Host header, so every
+client must use the same service name. This demo uses `http://keycloak:8080`
+everywhere (see `KC_ISSUER` in `src/shared/tokens.py` and `src/agent/agent.py`).
+Mixing `keycloak` and `keycloak.agent-nhi.svc.cluster.local` produces different
+`iss` values and breaks validation.
 
 **Agent pod can't fetch SVID (`workload api ... no identity issued`)**
 The registration entry doesn't match the pod. Entry must be
@@ -68,6 +81,9 @@ Keycloak grant script double-applies and errors, fastest clean slate is
 
 ## Pinned versions
 
-kind (any recent), SPIRE 1.11.2, oidc-discovery-provider 1.11.2,
-Keycloak 26.0, OPA 0.68.0, python:3.13-slim images. Bumping: change tags in
-`k8s/**`, re-run setup, re-run attack tests.
+kind (any recent), SPIRE 1.11.2 (server + agent are CUSTOM builds — see
+`docker/spire-server.Dockerfile` and `docker/spire-agent.Dockerfile`),
+oidc-discovery-provider 1.11.2, Keycloak 26.6.4, OPA 0.68.0, python:3.13-slim
+images, Go 1.25 (plugin) / 1.23 (SPIRE agent) in the build stages.
+Bumping: change tags in `k8s/**` and the Dockerfiles, re-run setup, re-run
+attack tests.

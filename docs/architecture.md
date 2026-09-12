@@ -39,12 +39,18 @@ ever being copied.
 **Function:** OAuth 2.0 authorization server. Issues alice's user token;
 authenticates the agent **as a client whose client_id IS its SPIFFE ID**
 using the JWT-SVID as a client assertion (verified against the SPIRE JWKS —
-the agent has no client secret); performs the two RFC 8693 token exchanges.
+the agent has no client secret); performs the two RFC 8693 token exchanges
+using **Standard Token Exchange V2** (Keycloak ≥ 26.2 — no fine-grained admin
+permissions involved; authorization is expressed through audience mappers).
 **What it proves:** *who delegated what to whom.* Output tokens carry
-`sub` (alice), `act.sub` (agent), `aud` (exactly one resource), TTL 5 min.
-**Config note:** exchange permissions are granted imperatively by
-`scripts/keycloak-token-exchange.sh` — four grants forming the delegation
-topology, worth reading as documentation.
+`sub` (alice), `azp` (the agent's SPIFFE ID — the workload the token was
+issued to), `aud` (the target resource), TTL 5 min.
+**Two SPIRE-side enablers this required** (see `spire-plugin/README.md` and
+`docker/spire-agent.Dockerfile`):
+1. a `jti` CredentialComposer plugin — Keycloak requires a `jti` on
+   `private_key_jwt` assertions and SPIRE does not mint one;
+2. a SPIRE agent with the JWT-SVID cache disabled — a cached SVID reuses its
+   `jti`, and Keycloak (correctly) rejects client-assertion reuse.
 
 ### AI Agent (`src/agent/`, `k8s/apps/agent.yaml`)
 **Function:** an LLM (Ollama by default, OpenAI optional) decides *which*
@@ -75,7 +81,7 @@ straight at it → 403. This is attack test #2.
 
 ### Audit (`src/shared/audit.py`)
 **Function:** every service emits one JSON line per event, always keyed by
-`(spiffe_id, sub, act, tool, decision)`.
+`(spiffe_id, sub, azp, tool, decision)`.
 **What it proves:** "which agent did what, on whose behalf, why was it
 allowed" is a `kubectl logs | grep` away, not an incident investigation.
 
@@ -95,12 +101,20 @@ allowed" is a `kubectl logs | grep` away, not an incident investigation.
 1. **HTTP inside the cluster** (Keycloak, SPIRE OIDC JWKS) — production: TLS
    everywhere; mTLS with X.509-SVIDs is the natural next step.
 2. **Demo passwords** for alice/admin/Keycloak — disposable cluster.
-3. **SPIRE `jwt_issuer` pinned to the agent's SPIFFE ID** — makes Keycloak's
-   client-JWT validation happy in a single-workload demo. Production: an AS
-   that natively profiles SPIFFE client auth
-   (`draft-ietf-oauth-spiffe-client-auth`).
-4. **Server-side client secrets** (tool-server, customer-api, demo-cli) are
+3. **Two custom SPIRE builds**, both forced by real Keycloak requirements:
+   a **server** with the `jti` CredentialComposer plugin (Keycloak requires
+   `jti` on `private_key_jwt` assertions) and an **agent** with the JWT-SVID
+   cache disabled (a cached SVID reuses its `jti`). Production: use an
+   authorization server that natively profiles SPIFFE client auth
+   (`draft-ietf-oauth-spiffe-client-auth`), which makes both workarounds
+   unnecessary. See `spire-plugin/README.md`.
+4. **SPIRE `jwt_issuer` pinned to the agent's SPIFFE ID** — makes Keycloak's
+   client-JWT validation accept the SVID as a client assertion (Keycloak wants
+   `iss` == `sub` == client_id) in a single-workload demo.
+5. **Issuer consistency:** all clients use `http://keycloak:8080` because
+   Keycloak derives `iss` from the request Host header.
+6. **Server-side client secrets** (tool-server, customer-api, demo-cli) are
    plain env values — production: K8s Secrets + rotation, or SPIFFE federation
    for those workloads too.
-5. **The user's token is fetched by `demo.sh`** — standing in for alice's
+7. **The user's token is fetched by `demo.sh`** — standing in for alice's
    browser session; the agent only ever *receives* it.

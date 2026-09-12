@@ -9,7 +9,8 @@ demo shows the enterprise alternative on a local Kubernetes cluster:
 - the agent gets a **cryptographic workload identity** (SPIFFE ID, issued by
   SPIRE after Kubernetes attests the pod) — it never touches a secret
 - it acts **on behalf of a user** via OAuth 2.0 **token exchange** (RFC 8693,
-  Keycloak) — every token carries the delegation chain `sub=user → act=agent`
+  Keycloak Standard Token Exchange V2) — every token carries the delegation
+  binding `sub` (the user) + `azp` (the workload the token was issued to)
 - every tool call is **authorized by policy** (OPA, deny-by-default)
 - tokens are **never forwarded** — each hop exchanges for its own
   audience-scoped token
@@ -29,7 +30,7 @@ flowchart TB
         TS --> CA["Customer API<br/>(downstream, own audience)"]
     end
     subgraph AUDIT["AUDIT PLANE"]
-        LOG["Structured log stream<br/>(spiffe_id, sub, act, tool, decision)"]
+        LOG["Structured log stream<br/>(spiffe_id, sub, azp, tool, decision)"]
     end
     U -- "1. login → user token" --> KC
     SA -- "2. attestation → SVID (no secrets)" --> AG
@@ -64,7 +65,7 @@ default LLM path: Ollama (`brew install ollama && ollama pull llama3.2:3b`).
 
 | Doc | Read it if you want… |
 |---|---|
-| [docs/glossary.md](docs/glossary.md) | the vocabulary (NHI, SVID, `act`, …) in plain language |
+| [docs/glossary.md](docs/glossary.md) | the vocabulary (NHI, SVID, `azp`, …) in plain language |
 | [docs/architecture.md](docs/architecture.md) | every component, what it proves, the 6-hop flow |
 | [docs/threat-model.md](docs/threat-model.md) | the attacks this stops — and the one static secret it doesn't |
 | [docs/presenting-the-demo.md](docs/presenting-the-demo.md) | a 10-minute talk track for showing this to people |

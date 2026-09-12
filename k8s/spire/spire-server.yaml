@@ -20,6 +20,7 @@ metadata:
   namespace: agent-nhi
 ---
 # Lets SPIRE Server validate projected SA tokens of node agents (k8s_psat).
+# It also needs to READ the agent pod/node to confirm the token's origin.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -28,6 +29,9 @@ rules:
   - apiGroups: ["authentication.k8s.io"]
     resources: ["tokenreviews"]
     verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -142,6 +146,15 @@ data:
           namespace = "agent-nhi"
         }
       }
+
+      # External CredentialComposer plugin (built by docker/spire-server.Dockerfile,
+      # source in spire-plugin/). It adds a unique `jti` claim to every workload
+      # JWT-SVID, which Keycloak's private_key_jwt client authentication requires
+      # (RFC 7523) but SPIRE does not mint by default. Nothing else is changed.
+      CredentialComposer "jti" {
+        plugin_cmd = "/opt/spire/plugins/jti-plugin"
+        plugin_data {}
+      }
     }
 ---
 apiVersion: v1
@@ -152,7 +165,7 @@ metadata:
 data:
   oidc-discovery-provider.conf: |
     log_level = "info"
-    domain    = "spire-oidc-discovery.agent-nhi.svc.cluster.local"
+    domains   = ["spire-oidc-discovery.agent-nhi.svc.cluster.local"]
 
     server_api {
       address = "unix:///run/spire/server/private/api.sock"
@@ -211,7 +224,10 @@ spec:
       shareProcessNamespace: true
       containers:
         - name: spire-server
-          image: ghcr.io/spiffe/spire-server:1.11.2
+          # Custom image = stock SPIRE server + the `jti` CredentialComposer
+          # plugin. Built and loaded into kind by scripts/setup.sh.
+          image: agent-nhi/spire-server-jti:demo
+          imagePullPolicy: IfNotPresent
           args: ["-config", "/run/spire/config/server.conf"]
           ports:
             - containerPort: 8081
@@ -225,7 +241,12 @@ spec:
               mountPath: /run/spire/server/private
           livenessProbe:
             exec:
-              command: ["/opt/spire/bin/spire-server", "healthcheck"]
+              # Must point at our configured socket, not the CLI default.
+              command:
+                - /opt/spire/bin/spire-server
+                - healthcheck
+                - -socketPath
+                - /run/spire/server/private/api.sock
             initialDelaySeconds: 15
             periodSeconds: 30
         - name: oidc-discovery-provider

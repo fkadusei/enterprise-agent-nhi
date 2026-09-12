@@ -23,7 +23,9 @@ app = FastAPI(title="customer-api (downstream)")
 def authorized(authorization: str = Header(...)) -> dict:
     token = authorization.removeprefix("Bearer ")
     try:
-        return verify_access_token(token, expected_audience="customer-api")
+        return verify_access_token(
+            token, expected_audience="customer-api", expected_azp="tool-server"
+        )
     except TokenRejected as exc:
         audit("token.rejected", service="customer-api", reason=str(exc))
         raise HTTPException(status_code=403, detail=str(exc))

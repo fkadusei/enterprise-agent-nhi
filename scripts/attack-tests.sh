@@ -22,10 +22,10 @@ kubectl -n $NS run rogue --image=agent-nhi/agent:demo --restart=Never \
   --overrides='{"spec":{"serviceAccountName":"default","containers":[{"name":"rogue","image":"agent-nhi/agent:demo","command":["sleep","infinity"],"volumeMounts":[{"name":"sock","mountPath":"/run/spire/sockets","readOnly":true}]}],"volumes":[{"name":"sock","hostPath":{"path":"/run/spire/sockets","type":"Directory"}}]}}' >/dev/null
 kubectl -n $NS wait --for=condition=Ready pod/rogue --timeout=120s >/dev/null
 OUT=$(kubectl -n $NS exec rogue -- python -c "
-from pyspiffe.workloadapi.workload_api_client import WorkloadApiClient
-c = WorkloadApiClient(spiffe_socket_path='unix:///run/spire/sockets/agent.sock')
+from spiffe.workloadapi.workload_api_client import WorkloadApiClient
+c = WorkloadApiClient(socket_path='unix:///run/spire/sockets/agent.sock')
 try:
-    s = c.fetch_jwt_svid(audiences=['x']); print('GOT', s.spiffe_id)
+    s = c.fetch_jwt_svid(audience={'x'}); print('GOT', s.spiffe_id)
 except Exception as e:
     print('REFUSED')
 c.close()" 2>/dev/null)

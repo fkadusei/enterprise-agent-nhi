@@ -36,11 +36,17 @@ agent exchanges alice's token for one scoped to the tool server. *Why you
 care:* it's the standards-based answer to "the agent acts on behalf of the
 user" — without handing the agent the user's credentials.
 
-**The `act` claim.** Inside an exchanged token: the *actor* — the workload
-that performed the exchange. Our tool tokens read `sub: alice` (the human),
-`act.sub: spiffe://.../sa/agent` (the agent). *Why you care:* audit and
-policy become precise: not "some client did X" but "THIS agent did X FOR
-alice."
+**The `azp` claim (the actor).** Inside an exchanged token: the workload the
+token was **issued to** — i.e. the workload that performed the exchange. Our
+tool tokens read `sub: alice` (the human), `azp: spiffe://.../sa/agent` (the
+agent). RFC 8693 calls this the actor and uses an `act` claim; Keycloak's
+Standard Token Exchange V2 surfaces it as `azp`, so that is what we validate.
+*Why you care:* audit and policy become precise: not "some client did X" but
+"THIS agent did X FOR alice."
+
+**`jti` (JWT ID).** A unique identifier for a single JWT. Keycloak requires it
+on `private_key_jwt` client assertions and rejects reuse — which is why this
+demo runs a tiny SPIRE plugin that adds one (see `spire-plugin/`).
 
 **Audience (`aud`).** Who a token is minted *for*. The tool server only
 accepts `aud=tool-server`; the customer API only `aud=customer-api`. *Why you

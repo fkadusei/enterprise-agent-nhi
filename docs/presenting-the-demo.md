@@ -28,10 +28,11 @@ makes forwarding useless."*
 `./scripts/demo.sh` — walk the beats. After beat 2, point at the
 `token.exchanged` audit line:
 ```json
-{"event":"token.exchanged","sub":"alice","act":"spiffe://.../agent","aud":"tool-server","ttl":300}
+{"event":"policy.decision","service":"tool-server","spiffe_id":"spiffe://.../agent",
+ "sub":"alice","tool":"customer.profile.read","decision":"allow","reason":"allowed by policy"}
 ```
-> "One token, three facts: WHO the human is, WHAT the agent is, WHERE this
-> token may be used. Five-minute TTL."
+> "One line, four facts: WHO the human is (`sub`), WHAT workload is acting
+> (`spiffe_id`), WHAT it asked for, and WHY it was allowed. Five-minute tokens."
 
 ### Beat 3 — the attack suite (3 min, the climax)
 `./scripts/attack-tests.sh`. Say each attack BEFORE running it, then let the

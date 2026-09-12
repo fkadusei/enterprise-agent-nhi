@@ -21,6 +21,10 @@ CUSTOMER_API_URL = os.environ.get(
     "CUSTOMER_API_URL", "http://customer-api.agent-nhi.svc.cluster.local:9000"
 )
 TOKEN_URL = f"{KC_ISSUER}/protocol/openid-connect/token"
+# The one workload identity this tool server accepts tokens from (azp check).
+AGENT_SPIFFE_ID = os.environ.get(
+    "AGENT_SPIFFE_ID", "spiffe://acme.com/ns/agent-nhi/sa/agent"
+)
 # Server-side demo credential (see docs/threat-model.md — this is NOT the
 # agent's credential; the agent has none).
 TOOL_SERVER_SECRET = os.environ.get("TOOL_SERVER_CLIENT_SECRET", "tool-server-secret-demo")
@@ -36,7 +40,9 @@ app = FastAPI(title="tool-server (policy enforcement point)")
 def verified_claims(authorization: str = Header(...)) -> dict:
     token = authorization.removeprefix("Bearer ")
     try:
-        return verify_access_token(token, expected_audience="tool-server")
+        return verify_access_token(
+            token, expected_audience="tool-server", expected_azp=AGENT_SPIFFE_ID
+        )
     except TokenRejected as exc:
         audit("token.rejected", service="tool-server", reason=str(exc))
         raise HTTPException(status_code=403, detail=str(exc))
@@ -54,7 +60,13 @@ def opa_allows(agent: str, user: str, tool: str) -> tuple[bool, str]:
 
 
 def exchange_for_downstream(subject_token: str) -> str:
-    """Hop 2: swap the (agent-presented) token for one scoped to customer-api."""
+    """Hop 2: swap the (agent-presented) token for one scoped to customer-api.
+
+    Keycloak standard token exchange issues the new token to THIS client
+    (tool-server), and this client's audience mapper adds customer-api to the
+    aud claim. No audience parameter is needed (and filtering here would only
+    narrow what the mapper already established).
+    """
     resp = httpx.post(
         TOKEN_URL,
         data={
@@ -64,7 +76,6 @@ def exchange_for_downstream(subject_token: str) -> str:
             "subject_token": subject_token,
             "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
             "requested_token_type": "urn:ietf:params:oauth:token-type:access_token",
-            "audience": "customer-api",
         },
         timeout=10,
     )

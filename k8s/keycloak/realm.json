@@ -6,6 +6,11 @@
     {
       "username": "alice",
       "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Example",
+      "email": "alice@example.com",
+      "requiredActions": [],
       "credentials": [
         { "type": "password", "value": "alice123", "temporary": false }
       ]
@@ -14,53 +19,100 @@
   "clients": [
     {
       "clientId": "demo-cli",
+      "description": "Stands in for alice's app/browser session. Audience mappers add the agent and tool-server to its tokens so the agent may exchange them.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "secret": "demo-cli-secret-demo",
       "serviceAccountsEnabled": true,
-      "authorizationServicesEnabled": true,
       "directAccessGrantsEnabled": true,
-      "standardFlowEnabled": false
+      "standardFlowEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "aud-agent",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "spiffe://acme.com/ns/agent-nhi/sa/agent",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "aud-tool-server",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "tool-server",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "spiffe://acme.com/ns/agent-nhi/sa/agent",
-      "description": "THE AGENT. client_id == SPIFFE ID. Authenticates with a JWT-SVID (client-jwt assertion); Keycloak verifies it against the JWKS served by SPIRE's OIDC discovery provider. No client secret exists for this client — that is the point of the demo.",
+      "description": "THE AGENT. client_id == SPIFFE ID. Authenticates with a JWT-SVID (client-jwt) verified against SPIRE's JWKS; no client secret exists. standard.token.exchange.enabled lets it exchange tokens.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-jwt",
       "serviceAccountsEnabled": true,
-      "authorizationServicesEnabled": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "attributes": {
         "use.jwks.url": "true",
         "jwks.url": "http://spire-oidc-discovery.agent-nhi.svc.cluster.local:11080/keys",
-        "token.endpoint.auth.signing.alg": "ES256"
-      }
+        "token.endpoint.auth.signing.alg": "ES256",
+        "standard.token.exchange.enabled": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-tool-server",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "tool-server",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "tool-server",
-      "description": "Resource server for the demo tools. Its secret is a server-side credential (the agent never sees it); used for the hop-2 token exchange.",
+      "description": "Resource server for the demo tools, and requester for hop-2 exchange. Its audience mapper adds customer-api to the token it exchanges for.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "secret": "tool-server-secret-demo",
       "serviceAccountsEnabled": true,
-      "authorizationServicesEnabled": true,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-customer-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "customer-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "customer-api",
-      "description": "Downstream resource server. Only accepts tokens with aud=customer-api, which is what makes token forwarding fail.",
+      "description": "Downstream resource server. Accepts only tokens whose aud contains customer-api AND that were issued to the tool server (azp) — which is what makes token forwarding fail.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "secret": "customer-api-secret-demo",
       "serviceAccountsEnabled": true,
-      "authorizationServicesEnabled": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false
     }

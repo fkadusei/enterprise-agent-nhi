@@ -37,14 +37,25 @@ through it. Challenge anything marked ⚠ — those are the judgment calls.
 - The agent's pod spec (`k8s/apps/agent.yaml`) contains **no** credential
   beyond the optional, absent-by-default LLM key.
 
-## Known Stage 2 risks (already have fallbacks — see runbook)
+## Stage 2 outcome (all items below resolved)
 
-- Keycloak accepting SPIRE's plain-HTTP JWKS URL (fallback: import bundle key
-  via kcadm — scripted guidance in runbook).
-- Keycloak's token-exchange permission API being fiddly across versions
-  (pinned to 26.0; grant script is the single place to adjust).
-- py-spiffe's `fetch_jwt_svid` signature drift (agent code is written
-  defensively; first real test is setup.sh GATE step 7).
+- **Keycloak token exchange**: switched to **Standard Token Exchange V2**
+  (26.6.4) — no fine-grained admin permissions needed at all. The legacy
+  fine-grained permission path (and its script) was removed.
+- **JWT client auth**: Keycloak requires a `jti` claim on `private_key_jwt`
+  assertions, which SPIRE doesn't mint. Added a small **CredentialComposer
+  plugin** (`spire-plugin/`, built into a custom SPIRE server image).
+- **Client-assertion reuse**: SPIRE's agent caches JWT-SVIDs (same `jti`), and
+  Keycloak rejects reuse. Added a **custom SPIRE agent image** that disables
+  the JWT-SVID cache (`docker/spire-agent.Dockerfile`).
+- **py-spiffe API drift**: package is now `spiffe` (not `pyspiffe`), pinned to
+  0.3.1 with `socket_path=` / `fetch_jwt_svid(audience=...)`.
+- **Issuer consistency**: all clients use `http://keycloak:8080` because
+  Keycloak derives `iss` from the request Host header.
+- **Policy identity**: tokens expose `preferred_username`; the delegation
+  helper uses it so OPA keys on `alice`, not her UUID.
+- Verified end-to-end: happy path returns the profile (HTTP 200); all three
+  attack tests are blocked. Real outputs are in the Stage 2 commit message.
 
 ## Sign off by replying "proceed" (plus any changes). Stage 2 then builds the
 cluster, runs the gates and attack tests, and pastes real outputs into the

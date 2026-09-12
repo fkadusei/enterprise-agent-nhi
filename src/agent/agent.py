@@ -27,7 +27,7 @@ from shared.audit import audit  # noqa: E402
 # --- configuration -----------------------------------------------------------
 SPIFFE_SOCKET = os.environ.get("SPIFFE_SOCKET", "unix:///run/spire/sockets/agent.sock")
 KC_ISSUER = os.environ.get(
-    "KC_ISSUER", "http://keycloak.agent-nhi.svc.cluster.local:8080/realms/agent-nhi"
+    "KC_ISSUER", "http://keycloak:8080/realms/agent-nhi"
 )
 TOOL_SERVER_URL = os.environ.get(
     "TOOL_SERVER_URL", "http://tool-server.agent-nhi.svc.cluster.local:8000"
@@ -87,11 +87,13 @@ def decide_tool(task: str) -> dict:
 
 # --- 2. workload identity (the zero-secrets part) -----------------------------
 def fetch_jwt_svid() -> str:
-    from pyspiffe.workloadapi.workload_api_client import WorkloadApiClient
+    # Package `spiffe` (>=0.2): import path and constructor changed from the
+    # old `pyspiffe`/`spiffe_socket_path` API. Pinned to 0.3.1 in requirements.
+    from spiffe.workloadapi.workload_api_client import WorkloadApiClient
 
-    client = WorkloadApiClient(spiffe_socket_path=SPIFFE_SOCKET)
+    client = WorkloadApiClient(socket_path=SPIFFE_SOCKET)
     try:
-        svid = client.fetch_jwt_svid(audiences=[KC_ISSUER])
+        svid = client.fetch_jwt_svid(audience={KC_ISSUER})
         audit("svid.issued", spiffe_id=str(svid.spiffe_id), aud=list(svid.audience))
         return svid.token
     finally:
@@ -111,7 +113,9 @@ def exchange_for_tool_server(svid: str, user_token: str) -> str:
             "subject_token": user_token,
             "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
             "requested_token_type": "urn:ietf:params:oauth:token-type:access_token",
-            "audience": "tool-server",
+            # No audience parameter: Keycloak standard token exchange issues
+            # the new token to THIS client (azp = the agent's SPIFFE ID) and
+            # applies this client's audience mapper (tool-server).
         },
         timeout=15,
     )
@@ -136,11 +140,11 @@ def main() -> None:
     svid = fetch_jwt_svid()
     tool_token = exchange_for_tool_server(svid, USER_TOKEN)
 
-    # Show the delegation chain the exchange produced (decode for display only).
+    # Show the delegation binding the exchange produced (decode for display only).
     import jwt as pyjwt
     claims = pyjwt.decode(tool_token, options={"verify_signature": False})
-    audit("token.exchanged", sub=claims.get("sub"),
-          act=(claims.get("act") or {}).get("sub"), aud=claims.get("aud"),
+    audit("token.exchanged", sub=claims.get("sub"), azp=claims.get("azp"),
+          aud=claims.get("aud"),
           ttl=claims.get("exp", 0) - claims.get("iat", 0))
 
     resp = httpx.post(
