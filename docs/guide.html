@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Enterprise NHI for AI Agents — A Plain-Language Guide</title>
 <style>
+  /* ---- light theme (default) ---- */
   :root {
+    color-scheme: light;
     --bg: #fbfbfd;
     --panel: #ffffff;
     --ink: #1f2430;
@@ -13,16 +15,83 @@
     --line: #e4e7ee;
     --accent: #3b5bdb;
     --accent-soft: #eef2ff;
+    --accent-border: #d5ddff;
     --green: #157347;
     --green-soft: #e8f6ee;
+    --green-border: #c9e9d6;
     --amber: #9a6700;
     --amber-soft: #fff8e6;
+    --amber-border: #f2e2b8;
     --red: #b42318;
     --red-soft: #fdecea;
+    --red-border: #f6cfca;
+    --note-bg: #f6f7fb;
+    --table-head-bg: #f6f7fb;
+    --inline-code-bg: #f1f3f8;
     --code-bg: #0f172a;
     --code-ink: #e6edf7;
+    --code-border: transparent;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05);
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  /* ---- dark theme: explicit choice ---- */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --panel: #131a24;
+    --ink: #e6edf3;
+    --muted: #9aa7b4;
+    --line: #26303d;
+    --accent: #8ab4ff;
+    --accent-soft: #17233a;
+    --accent-border: #2b4066;
+    --green: #5fd39a;
+    --green-soft: #12271e;
+    --green-border: #244a38;
+    --amber: #e3b341;
+    --amber-soft: #2a2210;
+    --amber-border: #4d3f1a;
+    --red: #ff8f85;
+    --red-soft: #2a1513;
+    --red-border: #552823;
+    --note-bg: #161d27;
+    --table-head-bg: #161d27;
+    --inline-code-bg: #1b2431;
+    --code-bg: #0a0f16;
+    --code-ink: #e6edf7;
+    --code-border: #26303d;
+    --shadow: none;
+  }
+  /* ---- dark theme: follow the operating system ---- */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: #131a24;
+      --ink: #e6edf3;
+      --muted: #9aa7b4;
+      --line: #26303d;
+      --accent: #8ab4ff;
+      --accent-soft: #17233a;
+      --accent-border: #2b4066;
+      --green: #5fd39a;
+      --green-soft: #12271e;
+      --green-border: #244a38;
+      --amber: #e3b341;
+      --amber-soft: #2a2210;
+      --amber-border: #4d3f1a;
+      --red: #ff8f85;
+      --red-soft: #2a1513;
+      --red-border: #552823;
+      --note-bg: #161d27;
+      --table-head-bg: #161d27;
+      --inline-code-bg: #1b2431;
+      --code-bg: #0a0f16;
+      --code-ink: #e6edf7;
+      --code-border: #26303d;
+      --shadow: none;
+    }
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -30,6 +99,7 @@
     margin: 0; background: var(--bg); color: var(--ink);
     font-family: var(--sans); font-size: 17px; line-height: 1.72;
     -webkit-font-smoothing: antialiased;
+    transition: background .18s ease, color .18s ease;
   }
   .layout { display: grid; grid-template-columns: 288px minmax(0, 1fr); }
   /* ---- sidebar ---- */
@@ -39,6 +109,16 @@
   }
   nav.toc .brand { font-weight: 700; font-size: 15px; letter-spacing: .02em; }
   nav.toc .brand span { display: block; color: var(--muted); font-weight: 500; font-size: 12.5px; margin-top: 3px; }
+  .theme-toggle { display: flex; gap: 6px; margin-top: 16px; }
+  .theme-toggle button {
+    flex: 1; font: inherit; font-size: 12px; padding: 6px 4px; cursor: pointer;
+    color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 7px;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .theme-toggle button:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-toggle button[aria-pressed="true"] {
+    background: var(--accent-soft); color: var(--accent); border-color: var(--accent-border); font-weight: 600;
+  }
   nav.toc ol { list-style: none; margin: 20px 0 0; padding: 0; counter-reset: s; }
   nav.toc li { margin: 1px 0; }
   nav.toc a {
@@ -62,43 +142,43 @@
   ul, ol { padding-left: 22px; }
   li { margin: 5px 0; }
   code {
-    font-family: var(--mono); font-size: .86em; background: #f1f3f8;
-    padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: .86em; background: var(--inline-code-bg);
+    padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--ink);
   }
   pre {
     background: var(--code-bg); color: var(--code-ink); padding: 16px 18px;
     border-radius: 10px; overflow-x: auto; font-size: 13.5px; line-height: 1.6;
-    font-family: var(--mono); margin: 16px 0;
+    font-family: var(--mono); margin: 16px 0; border: 1px solid var(--code-border);
   }
   pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
   table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; }
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { background: #f6f7fb; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  th { background: var(--table-head-bg); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   tr:last-child td { border-bottom: none; }
   /* ---- callouts ---- */
-  .box { border-radius: 10px; padding: 14px 18px; margin: 20px 0; border: 1px solid var(--line); background: var(--panel); }
+  .box { border-radius: 10px; padding: 14px 18px; margin: 20px 0; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); }
   .box .tag { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .06em;
     text-transform: uppercase; margin-bottom: 6px; }
   .box p:first-of-type { margin-top: 0; }
   .box p:last-child { margin-bottom: 0; }
-  .why { background: var(--accent-soft); border-color: #d5ddff; }
+  .why { background: var(--accent-soft); border-color: var(--accent-border); }
   .why .tag { color: var(--accent); }
-  .decision { background: var(--green-soft); border-color: #c9e9d6; }
+  .decision { background: var(--green-soft); border-color: var(--green-border); }
   .decision .tag { color: var(--green); }
-  .warn { background: var(--amber-soft); border-color: #f2e2b8; }
+  .warn { background: var(--amber-soft); border-color: var(--amber-border); }
   .warn .tag { color: var(--amber); }
-  .danger { background: var(--red-soft); border-color: #f6cfca; }
+  .danger { background: var(--red-soft); border-color: var(--red-border); }
   .danger .tag { color: var(--red); }
-  .note { background: #f6f7fb; }
+  .note { background: var(--note-bg); }
   .note .tag { color: var(--muted); }
   .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 18px 0; font-size: 14px; }
   .flow .n { display: inline-flex; align-items: center; gap: 6px; background: var(--panel);
     border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
   .flow .n b { color: var(--accent); }
   .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px;
-    background: var(--accent-soft); color: var(--accent); border: 1px solid #d5ddff; font-weight: 600; }
-  .pill.g { background: var(--green-soft); color: var(--green); border-color: #c9e9d6; }
-  .pill.r { background: var(--red-soft); color: var(--red); border-color: #f6cfca; }
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); font-weight: 600; }
+  .pill.g { background: var(--green-soft); color: var(--green); border-color: var(--green-border); }
+  .pill.r { background: var(--red-soft); color: var(--red); border-color: var(--red-border); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
   @media (max-width: 900px) {
@@ -109,13 +189,33 @@
   }
   footer { margin-top: 70px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; }
   hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  @media print {
+    nav.toc, .theme-toggle { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    body { background: #fff; color: #000; }
+    .box, pre { break-inside: avoid; }
+  }
 </style>
+<script>
+  /* Apply a saved theme before first paint to avoid a flash of the wrong theme. */
+  (function () {
+    try {
+      var t = localStorage.getItem('nhi-guide-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 <div class="layout">
 
 <nav class="toc">
   <div class="brand">Enterprise NHI for AI Agents<span>A plain-language guide</span></div>
+  <div class="theme-toggle" role="group" aria-label="Color theme">
+    <button type="button" data-theme-btn="auto" title="Match system setting">Auto</button>
+    <button type="button" data-theme-btn="light" title="Light theme">Light</button>
+    <button type="button" data-theme-btn="dark" title="Dark theme">Dark</button>
+  </div>
   <ol>
     <li><a href="#problem">1. The problem</a></li>
     <li><a href="#idea">2. The idea in one page</a></li>
@@ -575,6 +675,33 @@ OLLAMA_HOST=0.0.0.0:11434 ollama serve   # leave this running</code></pre>
 </div>
 
 <script>
+  // Theme switch: Auto (follow the OS) / Light / Dark, remembered per browser.
+  (function () {
+    var root = document.documentElement;
+    var KEY = 'nhi-guide-theme';
+    var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-theme-btn]'));
+
+    function apply(mode) {
+      if (mode === 'light' || mode === 'dark') root.setAttribute('data-theme', mode);
+      else root.removeAttribute('data-theme');
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-theme-btn') === mode));
+      });
+    }
+
+    var saved = 'auto';
+    try { saved = localStorage.getItem(KEY) || 'auto'; } catch (e) {}
+    apply(saved);
+
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var mode = b.getAttribute('data-theme-btn');
+        try { localStorage.setItem(KEY, mode); } catch (e) {}
+        apply(mode);
+      });
+    });
+  })();
+
   // Lightweight scroll-spy: highlight the current section in the sidebar.
   (function () {
     var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
