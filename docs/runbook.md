@@ -7,6 +7,22 @@
 ./scripts/teardown.sh    # kind delete cluster --name agent-nhi
 ```
 
+## Secret safety
+
+No secret is ever committed. The real `.env` stays local (gitignored); the
+committed template is `.env.example`. Enable the local guard once per clone and
+scan whenever you like:
+
+```sh
+./scripts/install-hooks.sh   # pre-commit hook: blocks .env/keys, scans staged diffs
+./scripts/scan-secrets.sh    # scan working tree + full git history (gitleaks)
+```
+
+CI runs gitleaks with [`.gitleaks.toml`](../.gitleaks.toml) and fails if `.env`
+is ever tracked. The demo passwords (`admin`/`admin`, `alice123`) and client
+secrets (`*-secret-demo`) are disposable values for a local cluster, documented
+as such and allowlisted narrowly in the gitleaks config.
+
 Prereqs: Docker Desktop running, `kind`, `kubectl`. For the default LLM path:
 `brew install ollama && ollama pull llama3.2:3b`, then start it so the cluster
 can reach it — `OLLAMA_HOST=0.0.0.0:11434 ollama serve`. The agent calls it at

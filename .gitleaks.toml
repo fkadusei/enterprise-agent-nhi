@@ -1,0 +1,52 @@
+# gitleaks configuration — used by CI (gitleaks-action) and locally.
+#
+#   Full history scan :  gitleaks git -c .gitleaks.toml
+#   Working tree      :  gitleaks dir . -c .gitleaks.toml
+#   Staged (pre-commit):  gitleaks git --staged -c .gitleaks.toml
+#
+# The goal: catch ANY real secret, while not tripping on the documented,
+# disposable demo credentials printed in this repo's docs.
+title = "enterprise-agent-nhi"
+
+[extend]
+# Keep gitleaks' built-in rules (AWS keys, GitHub tokens, private keys, ...).
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Project-specific secret shapes
+# ---------------------------------------------------------------------------
+[[rules]]
+id = "llm-api-key-assignment"
+description = "An API key assigned to LLM_API_KEY"
+# Matches a real value (e.g. sk-...) but not the placeholder in .env.example.
+regex = '''(?i)LLM_API_KEY\s*[:=]\s*["']?(sk-[A-Za-z0-9_\-]{16,}|[A-Za-z0-9_\-]{32,})'''
+keywords = ["LLM_API_KEY"]
+
+[[rules]]
+id = "jwt-token"
+description = "A JWT / JWT-SVID (a live bearer credential must never be committed)"
+regex = '''eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}'''
+keywords = ["eyJ"]
+
+# ---------------------------------------------------------------------------
+# Allowlist: DEMO-ONLY values, scoped narrowly to the files that document them.
+# These exist only on a disposable local cluster and are printed in the docs.
+# matchCondition = AND means BOTH a listed path AND a listed value must match,
+# so a real secret anywhere else still fails the scan.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Documented demo-only credentials (disposable local cluster)"
+matchCondition = "AND"
+paths = [
+  '''^k8s/keycloak/realm\.json$''',
+  '''^k8s/keycloak/keycloak\.yaml$''',
+  '''^scripts/demo\.sh$''',
+  '''^scripts/attack-tests\.sh$''',
+  '''^\.env\.example$''',
+]
+regexes = [
+  '''alice123''',
+  '''demo-cli-secret-demo''',
+  '''tool-server-secret-demo''',
+  '''customer-api-secret-demo''',
+]

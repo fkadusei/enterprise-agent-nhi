@@ -646,7 +646,7 @@ OLLAMA_HOST=0.0.0.0:11434 ollama serve   # leave this running</code></pre>
 # edit .env → set LLM_API_KEY=sk-...
 # set LLM_PROVIDER=openai-compatible + LLM_BASE_URL/LLM_MODEL in k8s/apps/agent.yaml
 ./scripts/setup.sh          # creates a Kubernetes Secret from .env</code></pre>
-<p>The key is injected into the agent pod at runtime as a Kubernetes Secret — never baked into an image, a manifest, or git. CI runs gitleaks on every push and additionally fails if a <code>.env</code> is ever tracked, so a leaked key breaks the build instead of landing in history. The default path needs no <code>.env</code> at all: local Ollama holds no credentials.</p>
+<p>The key is injected into the agent pod at runtime as a Kubernetes Secret — never baked into an image, a manifest, or git. Three layers guard against accidents: a <strong>pre-commit hook</strong> (enable with <code>./scripts/install-hooks.sh</code>) blocks sensitive filenames and scans staged changes; <code>./scripts/scan-secrets.sh</code> scans the working tree and the entire git history on demand; and CI runs gitleaks on every push, failing if a <code>.env</code> is ever tracked — so a leaked key breaks the build instead of landing in history. The default path needs no <code>.env</code> at all: local Ollama holds no credentials.</p>
 
 <div class="box note"><span class="tag">If the LLM isn't running</span><p>The demo still works. The agent logs <code>llm.fallback</code> and uses a sensible default tool. The identity and policy flow — the actual subject of this guide — is completely unaffected. That separation is itself a design point: the LLM is optional to the security story.</p></div>
 

@@ -99,14 +99,30 @@ cp .env.example .env          # .env is gitignored — safe to create
 (`llm-api-key`) from it, so the key is injected into the agent pod at runtime —
 never baked into an image, a manifest, or git.
 
-Guard rails:
+Guard rails (defence in depth — assume one layer will be skipped):
 
 - `.env` (and `.env.*`, except `.env.example`) is in [`.gitignore`](.gitignore).
-- CI runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push **and**
-  an explicit check that `.env` is not tracked — so a leaked key fails the
-  build instead of landing in history.
+- **Pre-commit hook** blocks sensitive filenames (`.env`, `*.pem`, `*.key`,
+  `id_rsa`, …) and scans staged changes for secret content. Enable it once per
+  clone:
+  ```sh
+  ./scripts/install-hooks.sh      # git config core.hooksPath .githooks
+  ```
+- **[gitleaks](https://github.com/gitleaks/gitleaks)** with a project
+  [`.gitleaks.toml`](.gitleaks.toml) — the built-in rules plus custom ones for
+  `LLM_API_KEY` and JWTs, and a narrowly-scoped allowlist for the documented
+  demo values. Scan anytime:
+  ```sh
+  ./scripts/scan-secrets.sh       # working tree + full git history
+  ```
+- **CI** runs gitleaks on every push **and** an explicit check that `.env` is
+  never tracked — so a leaked key fails the build instead of landing in history.
 - The only other credentials are demo passwords for a disposable local
   cluster; see [docs/threat-model.md](docs/threat-model.md).
+
+**Rule of thumb:** if a value would let someone else do something real, it does
+not belong in git — not in code, config, a test fixture, a screenshot, or a
+commit message. `.env.example` shows the shape; the value stays local.
 
 ## Docs
 

@@ -63,5 +63,7 @@ jobs:
           echo "ok: no .env tracked (.env.example is the committed template)"
       - name: gitleaks
         uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
