@@ -48,6 +48,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Guard rail for the .env convention: the committed template is
+      # .env.example; the real .env must never be tracked.
+      - name: ensure no .env is committed
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env must never be committed — use .env.example instead"
+            exit 1
+          fi
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::a tracked .env file was found"
+            exit 1
+          fi
+          echo "ok: no .env tracked (.env.example is the committed template)"
       - name: gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:

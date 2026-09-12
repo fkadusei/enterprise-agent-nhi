@@ -77,6 +77,37 @@ change. See [`.env.example`](.env.example) and
 ./scripts/teardown.sh       # nuke the cluster
 ```
 
+## Configuration & secrets
+
+**No secret is ever committed.** The real `.env` stays on your machine and is
+gitignored; the committed template is [`.env.example`](.env.example). This is
+the standard pattern, and it is how you show someone else how to configure it —
+they read the template, copy it, and fill in their own value.
+
+The default path needs no `.env` at all: local Ollama holds no credentials.
+To use a remote, OpenAI-compatible LLM instead:
+
+```sh
+cp .env.example .env          # .env is gitignored — safe to create
+# edit .env and set: LLM_API_KEY=sk-...
+# then in k8s/apps/agent.yaml set LLM_PROVIDER: openai-compatible,
+# LLM_BASE_URL and LLM_MODEL, and re-run:
+./scripts/setup.sh
+```
+
+`setup.sh` reads `.env` if it exists and creates a Kubernetes Secret
+(`llm-api-key`) from it, so the key is injected into the agent pod at runtime —
+never baked into an image, a manifest, or git.
+
+Guard rails:
+
+- `.env` (and `.env.*`, except `.env.example`) is in [`.gitignore`](.gitignore).
+- CI runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push **and**
+  an explicit check that `.env` is not tracked — so a leaked key fails the
+  build instead of landing in history.
+- The only other credentials are demo passwords for a disposable local
+  cluster; see [docs/threat-model.md](docs/threat-model.md).
+
 ## Docs
 
 **New here? Start with [`docs/guide.html`](docs/guide.html)** — the whole thing

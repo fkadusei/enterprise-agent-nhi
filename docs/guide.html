@@ -640,6 +640,14 @@ OLLAMA_HOST=0.0.0.0:11434 ollama serve   # leave this running</code></pre>
 
 <p>To explore the flow visually before running anything, open <code>docs/visualization/index.html</code> by double-clicking it. It's a 3D walkthrough of the six hops with an attack mode.</p>
 
+<h3>Secrets: how configuration reaches the code</h3>
+<p>No secret is ever committed. The real <code>.env</code> stays on your machine and is gitignored; the committed template is <code>.env.example</code>. That template is the answer to "how do I show someone how to configure it?" — they read it, copy it, and fill in their own value. To use a remote, OpenAI-compatible model instead of local Ollama:</p>
+<pre><code>cp .env.example .env        # .env is gitignored — safe to create
+# edit .env → set LLM_API_KEY=sk-...
+# set LLM_PROVIDER=openai-compatible + LLM_BASE_URL/LLM_MODEL in k8s/apps/agent.yaml
+./scripts/setup.sh          # creates a Kubernetes Secret from .env</code></pre>
+<p>The key is injected into the agent pod at runtime as a Kubernetes Secret — never baked into an image, a manifest, or git. CI runs gitleaks on every push and additionally fails if a <code>.env</code> is ever tracked, so a leaked key breaks the build instead of landing in history. The default path needs no <code>.env</code> at all: local Ollama holds no credentials.</p>
+
 <div class="box note"><span class="tag">If the LLM isn't running</span><p>The demo still works. The agent logs <code>llm.fallback</code> and uses a sensible default tool. The identity and policy flow — the actual subject of this guide — is completely unaffected. That separation is itself a design point: the LLM is optional to the security story.</p></div>
 
 <!-- ============================================================ -->

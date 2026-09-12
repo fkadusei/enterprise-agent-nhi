@@ -7,7 +7,13 @@ venv/
 
 # Local secrets — NEVER commit. The only credential in this demo is the
 # optional LLM API key (see docs/threat-model.md "the last static credential").
+#
+# The pattern: the real .env stays local and is ignored; the committed
+# template is .env.example. Copy it and fill it in:
+#     cp .env.example .env
 .env
+.env.*
+!.env.example
 *.pem
 *.key
 

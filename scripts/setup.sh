@@ -9,6 +9,7 @@ cd "$(dirname "$0")/.."
 
 say()  { printf "\n\033[1;34m== %s\033[0m\n" "$*"; }
 ok()   { printf "\033[1;32m   ✓ %s\033[0m\n" "$*"; }
+info() { printf "\033[2m   · %s\033[0m\n" "$*"; }
 die()  { printf "\033[1;31m   ✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
 NS=agent-nhi
@@ -108,11 +109,16 @@ ok "opa serving deny-by-default policy"
 
 say "6. demo apps"
 # Optional remote-LLM path: only if you created .env with LLM_API_KEY.
+# .env is gitignored; .env.example is the committed template (see README).
 if [ -f .env ] && grep -q '^LLM_API_KEY=' .env; then
   KEY=$(grep '^LLM_API_KEY=' .env | cut -d= -f2-)
   kubectl -n $NS create secret generic llm-api-key --from-literal=LLM_API_KEY="$KEY" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   ok "llm-api-key secret created (set LLM_PROVIDER=openai-compatible + LLM_BASE_URL/LLM_MODEL to use)"
+else
+  info "no .env with LLM_API_KEY found — using local Ollama (zero credentials)"
+  info "for a remote LLM: cp .env.example .env, add LLM_API_KEY, set"
+  info "  LLM_PROVIDER=openai-compatible + LLM_BASE_URL/LLM_MODEL in k8s/apps/agent.yaml"
 fi
 kubectl apply -f k8s/apps/ >/dev/null
 # Same image tag but possibly new content (e.g. code changes) — force a restart
