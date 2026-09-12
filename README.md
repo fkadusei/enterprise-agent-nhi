@@ -72,8 +72,14 @@ default tool — the identity/policy flow is unaffected.)
 
 ## Docs
 
+**New here? Start with [`docs/guide.html`](docs/guide.html)** — the whole thing
+explained in plain language: the problem, the design, the reasoning behind each
+decision, the tech stack, and the design implications. Open it by
+double-clicking (self-contained, no server needed).
+
 | Doc | Read it if you want… |
 |---|---|
+| [docs/guide.html](docs/guide.html) | **the plain-language guide** — problem, decisions, implications (start here) |
 | [docs/glossary.md](docs/glossary.md) | the vocabulary (NHI, SVID, `azp`, …) in plain language |
 | [docs/architecture.md](docs/architecture.md) | every component, what it proves, the 6-hop flow |
 | [docs/threat-model.md](docs/threat-model.md) | the attacks this stops — and the one static secret it doesn't |
