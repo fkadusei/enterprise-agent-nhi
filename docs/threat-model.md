@@ -37,16 +37,19 @@ with a perfectly valid token for alice → **403 from OPA** (alice isn't in the
 payments row of the policy table).
 
 ### T4. "Something happened" → forensic dead end
-**Mitigation:** every hop logs the full delegation chain
-`(spiffe_id, sub, act, tool, decision)`. One query reconstructs the incident.
+**Mitigation:** every hop logs the full delegation binding
+`(spiffe_id, sub, azp, tool, decision)`. One query reconstructs the incident.
 **Demonstrated by:** `demo.sh` beat 3 prints the audit trail.
 
 ## The last static credential (honest accounting)
 
-If you run the agent with `LLM_PROVIDER=openai`, an OpenAI API key sits in a
-K8s Secret mounted into the agent pod. That is a real static credential —
-the one remaining exception, kept because **third-party SaaS that only speaks
-API keys is exactly where SPIFFE stops helping.**
+The LLM is provider-agnostic. The default (`LLM_PROVIDER=ollama`) runs a local
+model and needs **no credential at all**. If you instead point the agent at a
+remote, OpenAI-compatible provider (`LLM_PROVIDER=openai-compatible` with
+`LLM_BASE_URL`/`LLM_MODEL`), that provider's API key sits in a K8s Secret
+mounted into the agent pod. That is a real static credential — the one
+remaining exception, kept because **third-party SaaS that only accepts API keys
+is exactly where SPIFFE stops helping.**
 
 The production pattern that eliminates it: an **LLM gateway** inside your
 trust domain. The agent authenticates to the gateway with its SVID; the

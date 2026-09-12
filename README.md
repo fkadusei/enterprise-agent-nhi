@@ -63,6 +63,13 @@ OLLAMA_HOST=0.0.0.0:11434 ollama serve   # leave running in another terminal
 Ollama isn't running, the agent logs `llm.fallback` and uses a deterministic
 default tool — the identity/policy flow is unaffected.)
 
+The LLM is **provider-agnostic**: the default is local Ollama (zero
+credentials), and any provider that speaks the OpenAI Chat Completions API
+(OpenAI, Groq, Together, vLLM, LiteLLM, …) can be used instead by setting
+`LLM_PROVIDER=openai-compatible` plus `LLM_BASE_URL` and `LLM_MODEL` — no code
+change. See [`.env.example`](.env.example) and
+[docs/threat-model.md](docs/threat-model.md) for the credential implications.
+
 ```sh
 ./scripts/setup.sh          # ~5 min: cluster, SPIRE, Keycloak, OPA, apps
 ./scripts/demo.sh           # the happy path, paced for presenting

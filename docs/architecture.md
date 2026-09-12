@@ -53,9 +53,11 @@ issued to), `aud` (the target resource), TTL 5 min.
    `jti`, and Keycloak (correctly) rejects client-assertion reuse.
 
 ### AI Agent (`src/agent/`, `k8s/apps/agent.yaml`)
-**Function:** an LLM (Ollama by default, OpenAI optional) decides *which*
-tool the task needs; identity machinery decides *whether it may*. Fetches its
-SVID (fresh per run), exchanges, calls the tool server.
+**Function:** an LLM decides *which* tool the task needs; identity machinery
+decides *whether it may*. The LLM is provider-agnostic: local (Ollama) by
+default, or any OpenAI-compatible endpoint (OpenAI, Groq, Together, vLLM,
+LiteLLM, …) via configuration. Fetches its SVID (fresh per run), exchanges,
+calls the tool server.
 **What it proves:** an agent can operate with **zero static credentials**.
 Its pod spec contains no secrets — only the Workload API socket mount.
 

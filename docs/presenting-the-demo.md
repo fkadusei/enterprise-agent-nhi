@@ -45,9 +45,11 @@ red `BLOCKED ✓` land:
 
 ### Beat 4 — the audit trail + the honest caveat (2 min)
 Scroll the tool-server/customer-api logs. Then the caveat that builds trust:
-> "One static secret remains if you use a commercial LLM API — the provider
-> key. The fix is an LLM gateway that accepts workload identity. Default here
-> is a local model precisely so the claim 'zero secrets' is literally true."
+> "The LLM is provider-agnostic — swap in any OpenAI-compatible provider with
+> a config change. The moment you do, that provider's key becomes the one
+> static secret left. The fix is an LLM gateway that accepts workload identity.
+> Default here is a local model precisely so the claim 'zero secrets' is
+> literally true."
 
 ### If it breaks mid-demo
 - Any pod not Ready → `kubectl -n agent-nhi get pods`, then show the 3D viz

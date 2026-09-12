@@ -19,8 +19,11 @@ kubectl -n agent-nhi exec deploy/agent -- \
   python -c "import httpx;print(httpx.get('http://host.docker.internal:11434/api/tags',timeout=5).json()['models'])"
 ```
 
-For the API-key LLM path instead: `cp .env.example .env`, add your key, set
-`LLM_PROVIDER: openai` in `k8s/apps/agent.yaml`, re-run setup.
+For a remote, OpenAI-compatible LLM instead of local Ollama: `cp .env.example
+.env`, add `LLM_API_KEY`, then set `LLM_PROVIDER: openai-compatible` plus
+`LLM_BASE_URL` and `LLM_MODEL` in `k8s/apps/agent.yaml` (e.g. Groq at
+`https://api.groq.com/openai/v1`), and re-run setup. Any provider that speaks
+the OpenAI Chat Completions API works — the code does not change.
 
 ## Browser access (optional)
 

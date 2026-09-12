@@ -3,8 +3,9 @@
 #   1. serviceAccountName: agent  -> this SA + this namespace is what SPIRE
 #      attests. The pod spec is how identity is DECIDED, not a credential.
 #   2. The only volume is the SPIFFE Workload API socket. No secret mounts,
-#      no env credentials (the optional OPENAI_API_KEY is the documented
-#      "last static credential" exception — see docs/threat-model.md).
+#      no env credentials (the optional LLM_API_KEY, for a remote
+#      OpenAI-compatible provider, is the documented "last static credential"
+#      exception — see docs/threat-model.md).
 # =============================================================================
 apiVersion: v1
 kind: ServiceAccount
@@ -33,19 +34,28 @@ spec:
           image: agent-nhi/agent:demo      # built + loaded into kind by setup.sh
           imagePullPolicy: IfNotPresent
           env:
+            # Provider-agnostic LLM. Default is Ollama's native API (no
+            # credentials). For any OpenAI-compatible provider, set
+            # LLM_PROVIDER=openai-compatible plus LLM_BASE_URL and LLM_MODEL
+            # (e.g. https://api.groq.com/openai/v1), and provide LLM_API_KEY
+            # via the secret below.
             - name: LLM_PROVIDER
-              value: ollama              # zero-credential default
+              value: ollama              # or: openai-compatible
             - name: OLLAMA_URL
               value: http://host.docker.internal:11434
+            # - name: LLM_BASE_URL
+            #   value: https://api.openai.com/v1
+            # - name: LLM_MODEL
+            #   value: gpt-4o-mini
             - name: SPIFFE_SOCKET
               value: unix:///run/spire/sockets/agent.sock
-            # Optional API-key path (LLM_PROVIDER=openai). Created by
-            # setup.sh from your gitignored .env; absent by default.
-            - name: OPENAI_API_KEY
+            # Optional API-key path. Created by setup.sh from your gitignored
+            # .env; absent by default.
+            - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: llm-api-key
-                  key: OPENAI_API_KEY
+                  key: LLM_API_KEY
                   optional: true
           volumeMounts:
             - name: spiffe-workload-api

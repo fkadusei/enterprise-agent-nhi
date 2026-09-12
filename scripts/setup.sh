@@ -107,12 +107,12 @@ kubectl -n $NS rollout status deploy/opa --timeout=120s >/dev/null
 ok "opa serving deny-by-default policy"
 
 say "6. demo apps"
-# Optional API-key LLM path: only if you created .env with OPENAI_API_KEY.
-if [ -f .env ] && grep -q '^OPENAI_API_KEY=' .env; then
-  KEY=$(grep '^OPENAI_API_KEY=' .env | cut -d= -f2-)
-  kubectl -n $NS create secret generic llm-api-key --from-literal=OPENAI_API_KEY="$KEY" \
+# Optional remote-LLM path: only if you created .env with LLM_API_KEY.
+if [ -f .env ] && grep -q '^LLM_API_KEY=' .env; then
+  KEY=$(grep '^LLM_API_KEY=' .env | cut -d= -f2-)
+  kubectl -n $NS create secret generic llm-api-key --from-literal=LLM_API_KEY="$KEY" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-  ok "llm-api-key secret created (set LLM_PROVIDER=openai in k8s/apps/agent.yaml to use)"
+  ok "llm-api-key secret created (set LLM_PROVIDER=openai-compatible + LLM_BASE_URL/LLM_MODEL to use)"
 fi
 kubectl apply -f k8s/apps/ >/dev/null
 # Same image tag but possibly new content (e.g. code changes) — force a restart

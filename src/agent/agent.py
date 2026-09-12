@@ -8,12 +8,25 @@ no token file. When it needs to act it:
   2. authenticates to Keycloak AS that identity (the SVID is its client
      assertion — Keycloak verifies it against SPIRE's published JWKS)
   3. exchanges the user's token (RFC 8693) for a 5-minute token scoped to
-     the tool server, carrying the delegation chain sub=user, act=agent
+     the tool server, carrying the delegation binding sub=user, azp=agent
   4. calls the tool the LLM decided on
 
 An LLM picks WHICH tool to call. Identity decides WHETHER it may.
-LLM_PROVIDER=ollama (default, zero credentials) or openai (the documented
-"last static credential" — see docs/threat-model.md).
+
+The LLM is provider-agnostic and configured entirely by environment:
+  LLM_PROVIDER=ollama              local model via Ollama's native API — the
+                                   default, and the only mode with ZERO
+                                   credentials.
+  LLM_PROVIDER=openai-compatible   any provider that speaks the OpenAI Chat
+                                   Completions API (OpenAI, Anthropic via a
+                                   compat gateway, Groq, Together, Fireworks,
+                                   vLLM, LM Studio, LiteLLM, Ollama's own /v1,
+                                   ...), configured with LLM_BASE_URL,
+                                   LLM_API_KEY and LLM_MODEL. This is the one
+                                   place a static secret can enter; see
+                                   docs/threat-model.md ("the last static
+                                   credential") for how to remove even that
+                                   with an LLM gateway.
 """
 import json
 import os
@@ -32,10 +45,15 @@ KC_ISSUER = os.environ.get(
 TOOL_SERVER_URL = os.environ.get(
     "TOOL_SERVER_URL", "http://tool-server.agent-nhi.svc.cluster.local:8000"
 )
+# Provider-agnostic LLM configuration. Anything that is not "ollama" is treated
+# as an OpenAI-compatible Chat Completions endpoint (the de-facto industry
+# interface), so switching providers is a config change, not a code change.
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:3b")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 TOKEN_URL = f"{KC_ISSUER}/protocol/openid-connect/token"
 
 TOOLS = {
@@ -56,19 +74,8 @@ def decide_tool(task: str) -> dict:
         '"reason": "<short>"}'
     )
     try:
-        if LLM_PROVIDER == "openai":
-            resp = httpx.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
-                json={
-                    "model": OPENAI_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "response_format": {"type": "json_object"},
-                },
-                timeout=30,
-            )
-            content = resp.json()["choices"][0]["message"]["content"]
-        else:  # ollama — local model, no credentials at all
+        if LLM_PROVIDER == "ollama":
+            # Local model via Ollama's native API — no credentials at all.
             resp = httpx.post(
                 f"{OLLAMA_URL}/api/generate",
                 json={"model": OLLAMA_MODEL, "prompt": prompt,
@@ -76,6 +83,20 @@ def decide_tool(task: str) -> dict:
                 timeout=120,
             )
             content = resp.json()["response"]
+        else:
+            # Any OpenAI-compatible provider. Swap providers by changing
+            # LLM_BASE_URL / LLM_MODEL / LLM_API_KEY — no code change.
+            resp = httpx.post(
+                f"{LLM_BASE_URL.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+                json={
+                    "model": LLM_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=60,
+            )
+            content = resp.json()["choices"][0]["message"]["content"]
         decision = json.loads(content)
         if decision.get("tool") in TOOLS:
             return decision
